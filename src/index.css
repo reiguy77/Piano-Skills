@@ -46,3 +46,10 @@ input[type='range'] { accent-color: var(--accent); }
 .keyboard .white.on { background: var(--accent); }
 .keyboard .black { position: absolute; top: 0; height: 62%; background: #1c1c1c; border-radius: 0 0 3px 3px; }
 .keyboard .black.on { background: var(--accent); }
+
+.segmented { display: flex; gap: 8px; margin: 8px 0; }
+.segmented button { flex: 1; }
+.segmented button[aria-pressed='true'] { background: var(--ink); color: var(--card); font-weight: 700; }
+.mic-status { display: flex; flex-direction: column; gap: 6px; }
+.meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.meter div { height: 100%; background: var(--ok); transition: width 80ms linear; }

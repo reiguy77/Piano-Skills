@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard } from './components/Keyboard';
 import { iiVIBars } from './drills/iiVI';
 import { startMetronome } from './midi/metronome';
+import { useMic } from './mic/useMic';
 import { useMidi, type Strike } from './midi/useMidi';
 import { gradeVoicing, noteName, type VoicingGrade } from './theory/chords';
 import { beatMs, gradeTiming, type TimingGrade } from './theory/timing';
@@ -15,10 +16,31 @@ interface BarResult {
 }
 
 type Phase = 'setup' | 'running' | 'done';
+type Input = 'midi' | 'mic';
+
+// Remembered per browser; storage can be unavailable (private windows), so fall back quietly.
+function stored<T extends string | number>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    return (typeof fallback === 'number' ? Number(v) : v) as T;
+  } catch {
+    return fallback;
+  }
+}
+function store(key: string, value: string | number) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // not remembered this time
+  }
+}
 
 export default function App() {
   const bars = useMemo(() => iiVIBars(), []);
   const [bpm, setBpm] = useState(120);
+  const [input, setInput] = useState<Input>(() => stored<Input>('input', 'midi'));
+  const [micLatency, setMicLatency] = useState(() => stored<number>('micLatencyMs', 40));
   const [phase, setPhase] = useState<Phase>('setup');
   const [barIndex, setBarIndex] = useState(-1);
   const [results, setResults] = useState<Record<number, BarResult>>({});
@@ -39,7 +61,15 @@ export default function App() {
     setResults((r) => (r[target] ? r : { ...r, [target]: result }));
   };
 
-  const { held, status, deviceName } = useMidi(onStrike);
+  const midi = useMidi(onStrike);
+  const mic = useMic(input === 'mic', onStrike, micLatency);
+  const held = [...new Set([...midi.held, ...mic.held])].sort((a, b) => a - b);
+  const { status, deviceName } = midi;
+
+  const chooseInput = (i: Input) => {
+    setInput(i);
+    store('input', i);
+  };
 
   useEffect(() => {
     if (phase !== 'running') return;
@@ -83,12 +113,24 @@ export default function App() {
     <main>
       <header>
         <h1>ii–V–I shells, 12 keys</h1>
-        <p className="muted">
-          {status === 'ready' && `MIDI: ${deviceName}`}
-          {status === 'no-device' && 'No MIDI device found. Plug one in, or use the A–L keys on your computer keyboard.'}
-          {status === 'unsupported' && 'This browser has no Web MIDI (try Chrome or Edge). Computer keys A–L still work.'}
-          {status === 'connecting' && 'Looking for MIDI devices…'}
-        </p>
+        <div className="segmented" role="group" aria-label="Input">
+          <button type="button" aria-pressed={input === 'midi'} onClick={() => chooseInput('midi')}>
+            MIDI keyboard
+          </button>
+          <button type="button" aria-pressed={input === 'mic'} onClick={() => chooseInput('mic')}>
+            Microphone
+          </button>
+        </div>
+        {input === 'mic' ? (
+          <MicStatusLine status={mic.status} level={mic.level} />
+        ) : (
+          <p className="muted">
+            {status === 'ready' && `MIDI: ${deviceName}`}
+            {status === 'no-device' && 'No MIDI device found. Plug one in, or use the A–L keys on your computer keyboard.'}
+            {status === 'unsupported' && 'This browser has no Web MIDI (try Chrome or Edge). Computer keys A–L still work.'}
+            {status === 'connecting' && 'Looking for MIDI devices…'}
+          </p>
+        )}
       </header>
 
       {phase === 'setup' && (
@@ -99,6 +141,27 @@ export default function App() {
           </p>
           <label htmlFor="bpm">Tempo: {bpm} BPM</label>
           <input id="bpm" type="range" min={60} max={240} value={bpm} onChange={(e) => setBpm(+e.target.value)} />
+          {input === 'mic' && (
+            <>
+              <label htmlFor="latency">Mic delay correction: {micLatency} ms</label>
+              <input
+                id="latency"
+                type="range"
+                min={0}
+                max={200}
+                step={5}
+                value={micLatency}
+                onChange={(e) => {
+                  setMicLatency(+e.target.value);
+                  store('micLatencyMs', +e.target.value);
+                }}
+              />
+              <p className="muted">
+                Wear headphones so the mic hears the piano, not the click. If chords you play on the beat keep
+                showing as late, raise the delay correction by about that much.
+              </p>
+            </>
+          )}
           <button type="button" className="primary" onClick={start}>
             Start drill
           </button>
@@ -147,6 +210,27 @@ export default function App() {
       <p className="muted">Holding: {held.map(noteName).join(' ') || 'nothing'}</p>
       <Keyboard held={held} />
     </main>
+  );
+}
+
+function MicStatusLine({ status, level }: { status: ReturnType<typeof useMic>['status']; level: number }) {
+  // Show the input level on a -60…0 dBFS scale.
+  const pct = Math.max(0, Math.min(100, ((20 * Math.log10(level + 1e-9) + 60) / 60) * 100));
+  return (
+    <div className="mic-status">
+      <p className="muted">
+        {status === 'listening' && 'Listening. Play a chord to check the notes it hears.'}
+        {status === 'starting' && 'Starting the microphone…'}
+        {status === 'denied' && 'Microphone access was blocked. Allow it in the address bar, then pick Microphone again.'}
+        {status === 'unsupported' && 'This browser can’t use the microphone here.'}
+        {status === 'off' && 'Microphone off.'}
+      </p>
+      {status === 'listening' && (
+        <div className="meter" aria-label="Microphone level">
+          <div style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
   );
 }
 
