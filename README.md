@@ -36,12 +36,14 @@ the click, and if on-the-beat chords keep showing as late, raise the mic delay c
   vets and fills in those notes. Accuracy on real piano recordings is measured in `bench/`.
 - `src/mic/onsets.ts` — finds chord attacks from the input level without retriggering on a ringing chord.
 - `src/mic/useMic.ts` — microphone input that reports chords the same way `useMidi` does.
-- `src/drills/iiVI.ts` — the first drill: major ii–V–I in all 12 keys around the cycle of 4ths.
+- `src/drills/iiVI.ts` — builds progressions spelled for their key (major and minor ii–V–I and friends).
+- `src/drills/library.ts` — the skills you pick from: ii–V–I (one key, chained, all 12), diatonic 7th
+  chords, the I–vi–ii–V turnaround, minor ii–V–i, “Autumn Leaves” changes and the 12-bar jazz blues.
 
 ## Roadmap
 
 1. Level / XP / stars and the skill tree (voicings, harmony, feel & comping, improvisation).
-2. More drills: rootless A/B voicings, minor ii–V–i, guide-tone lines, Charleston comping, blues.
+2. More drills: rootless A/B voicings, guide-tone lines, Charleston comping, minor blues, two chords per bar.
 3. Practice history and "work on" warm-ups built from missed keys and chords.
 4. ~~Microphone input as a fallback for acoustic pianos.~~ First version in; next is a tap-along
    latency calibration and tuning against real recordings.
