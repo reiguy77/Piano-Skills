@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard } from './components/Keyboard';
-import { iiVIBars } from './drills/iiVI';
+import { MeasureStrip } from './components/MeasureStrip';
+import { findSkill, KEYS, SKILLS } from './drills/library';
 import { startMetronome } from './midi/metronome';
 import { useMic } from './mic/useMic';
 import { useMidi, type Strike } from './midi/useMidi';
@@ -37,16 +38,24 @@ function store(key: string, value: string | number) {
 }
 
 export default function App() {
-  const bars = useMemo(() => iiVIBars(), []);
+  const [skillId, setSkillId] = useState(() => findSkill(stored('skill', SKILLS[0].id)).id);
+  const [key, setKey] = useState(() => {
+    const k = stored<number>('key', 0);
+    return Number.isInteger(k) && k >= 0 && k < 12 ? k : 0;
+  });
+  const skill = findSkill(skillId);
+  const bars = useMemo(() => skill.bars(key), [skill, key]);
   const [bpm, setBpm] = useState(120);
   const [input, setInput] = useState<Input>(() => stored<Input>('input', 'midi'));
   const [micLatency, setMicLatency] = useState(() => stored<number>('micLatencyMs', 40));
   const [phase, setPhase] = useState<Phase>('setup');
-  const [barIndex, setBarIndex] = useState(-1);
+  // Beats since the first downbeat; the count-in is -BEATS_PER_BAR…-1.
+  const [beat, setBeat] = useState(-BEATS_PER_BAR);
   const [results, setResults] = useState<Record<number, BarResult>>({});
   const run = useRef<{ downbeatMs: number; stop: () => void } | null>(null);
 
   const barMs = beatMs(bpm) * BEATS_PER_BAR;
+  const barIndex = Math.floor(beat / BEATS_PER_BAR);
 
   const onStrike = (s: Strike) => {
     if (phase !== 'running' || !run.current) return;
@@ -71,29 +80,39 @@ export default function App() {
     store('input', i);
   };
 
+  const chooseSkill = (id: string) => {
+    setSkillId(id);
+    store('skill', id);
+  };
+
+  const chooseKey = (k: number) => {
+    setKey(k);
+    store('key', k);
+  };
+
   useEffect(() => {
     if (phase !== 'running') return;
     let frame = 0;
     const tick = () => {
       const r = run.current!;
-      const i = Math.floor((performance.now() - r.downbeatMs) / barMs);
-      if (i >= bars.length) {
+      const b = Math.floor((performance.now() - r.downbeatMs) / beatMs(bpm));
+      if (b >= bars.length * BEATS_PER_BAR) {
         r.stop();
         setPhase('done');
         return;
       }
-      setBarIndex(i);
+      setBeat(Math.max(b, -BEATS_PER_BAR));
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [phase, barMs, bars.length]);
+  }, [phase, bpm, bars.length]);
 
   useEffect(() => () => run.current?.stop(), []);
 
   const start = () => {
     setResults({});
-    setBarIndex(-1);
+    setBeat(-BEATS_PER_BAR);
     run.current = startMetronome(bpm, bars.length * BEATS_PER_BAR, BEATS_PER_BAR, SWING);
     setPhase('running');
   };
@@ -105,14 +124,12 @@ export default function App() {
 
   const graded = Object.values(results);
   const clean = graded.filter((r) => r.voicing.correct && r.timing.onTime).length;
-  const current = bars[Math.max(barIndex, 0)];
-  const next = bars[barIndex + 1];
   const last = results[barIndex] ?? results[barIndex - 1];
 
   return (
     <main>
       <header>
-        <h1>ii–V–I shells, 12 keys</h1>
+        <h1>{skill.title(key)}</h1>
         <div className="segmented" role="group" aria-label="Input">
           <button type="button" aria-pressed={input === 'midi'} onClick={() => chooseInput('midi')}>
             MIDI keyboard
@@ -135,6 +152,31 @@ export default function App() {
 
       {phase === 'setup' && (
         <section className="card">
+          <fieldset className="skills">
+            <legend>Skill</legend>
+            {SKILLS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className="skill"
+                aria-pressed={s.id === skill.id}
+                onClick={() => chooseSkill(s.id)}
+              >
+                <strong>{s.name}</strong>
+                <span>{s.description}</span>
+              </button>
+            ))}
+          </fieldset>
+          {skill.needsKey && (
+            <fieldset className="keys">
+              <legend>{skill.keyLabel ?? 'Key'}</legend>
+              {KEYS.map((k) => (
+                <button key={k.pc} type="button" aria-pressed={k.pc === key} onClick={() => chooseKey(k.pc)}>
+                  {k.label}
+                </button>
+              ))}
+            </fieldset>
+          )}
           <p>
             Play a 3–7 shell for each chord, landing on beat 1 (or a swung eighth early). Root, 9 and 13 are
             optional; the 3rd and 7th are required.
@@ -171,10 +213,9 @@ export default function App() {
       {phase === 'running' && (
         <section className="card prompt">
           <p className="muted">
-            {barIndex < 0 ? 'Count-in…' : `Key of ${current.key} · bar ${barIndex + 1} of ${bars.length}`}
+            {barIndex < 0 ? `Count-in · key of ${bars[0].key}` : `Key of ${bars[barIndex].key} · bar ${barIndex + 1} of ${bars.length}`}
           </p>
-          <p className="chord">{barIndex < 0 ? bars[0].chord.symbol : current.chord.symbol}</p>
-          <p className="muted">Next: {next?.chord.symbol ?? 'end'}</p>
+          <MeasureStrip bars={bars} beat={beat} beatsPerBar={BEATS_PER_BAR} />
           {last && <Feedback result={last} />}
           <button type="button" onClick={stop}>
             Stop
