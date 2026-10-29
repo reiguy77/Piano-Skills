@@ -34,13 +34,27 @@ export function MeasureStrip({ bars, beat, beatsPerBar }: { bars: Bar[]; beat: n
             i === upcoming && 'next',
             i === upcoming && lastBeat && 'ready',
             keyChange && 'key-change',
+            bar.chords.length > 1 && 'split',
           ];
           return (
             <li key={i} className={classes.filter(Boolean).join(' ')} aria-current={i === barIndex ? 'step' : undefined}>
               <span className="measure-key">
                 {keyChange ? `→ ${bar.key}` : j === 0 ? bar.key : ' '}
               </span>
-              <span className="measure-chord">{bar.chord.symbol}</span>
+              <span className="measure-chord">
+                {bar.chords.map((c, k) => {
+                  // In a split bar, mark the half being played, and the second chord on the beat before it.
+                  const half = beatsPerBar / bar.chords.length;
+                  const split = bar.chords.length > 1 && i === barIndex;
+                  const now = split && Math.floor(beatInBar / half) === k;
+                  const ready = split && k > 0 && beatInBar === k * half - 1;
+                  return (
+                    <span key={k} className={now ? 'chord-now' : ready ? 'chord-ready' : undefined}>
+                      {c.symbol}
+                    </span>
+                  );
+                })}
+              </span>
               <span className="measure-tag">{i === barIndex ? 'now' : i === upcoming ? (lastBeat ? 'get ready' : 'next') : ' '}</span>
             </li>
           );

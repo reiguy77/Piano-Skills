@@ -1,8 +1,26 @@
 import { parseChord, type ChordSymbol, type Quality } from '../theory/chords';
 
+/** One bar of 4/4: a single chord, or two splitting the bar two beats each. */
 export interface Bar {
   key: string;
+  chords: ChordSymbol[];
+}
+
+/** A chord as it falls in time, which is what gets graded. */
+export interface Change {
   chord: ChordSymbol;
+  key: string;
+  bar: number;
+  /** First beat, counted from the first downbeat. */
+  beat: number;
+  beats: number;
+}
+
+export function changes(bars: Bar[], beatsPerBar: number): Change[] {
+  return bars.flatMap((b, bar) => {
+    const beats = beatsPerBar / b.chords.length;
+    return b.chords.map((chord, j) => ({ chord, key: b.key, bar, beat: bar * beatsPerBar + j * beats, beats }));
+  });
 }
 
 // Flat keys are spelled with flats (E♭m7 A♭7 D♭maj7), sharp keys with sharps (F♯m7 B7 Emaj7).
@@ -18,19 +36,31 @@ function spell(pc: number, tonic: number): string {
   return (SHARP_KEYS.has(((tonic % 12) + 12) % 12) ? SHARP_NAMES : FLAT_NAMES)[((pc % 12) + 12) % 12];
 }
 
-type Step = [offset: number, quality: Quality];
+/** A chord as a semitone offset from the tonic; `raised` spells it with a sharp, as in ♯IV°7. */
+type Step = [offset: number, quality: Quality, raised?: true];
+/** A whole-bar chord, or two chords of two beats each. */
+type BarSteps = Step | [Step, Step];
 
 /**
- * One chord per bar, each a scale-degree offset from the tonic. Chords are spelled for the major
+ * One bar per entry, each chord a semitone offset from the tonic. Chords are spelled for the major
  * key `spellIn` (a minor key passes its relative major), and every bar is labelled `key`.
  */
-export function progression(tonic: number, steps: Step[], key = keyName(tonic), spellIn = tonic): Bar[] {
+export function progression(tonic: number, bars: BarSteps[], key = keyName(tonic), spellIn = tonic): Bar[] {
   tonic = ((tonic % 12) + 12) % 12;
   spellIn = ((spellIn % 12) + 12) % 12;
-  return steps.map(([offset, quality]) => ({
+  const chord = ([offset, quality, raised]: Step) => {
+    const root = raised ? SHARP_NAMES[(tonic + offset) % 12] : spell(tonic + offset, spellIn);
+    return parseChord(`${root}${symbolFor(quality)}`);
+  };
+  return bars.map((b) => ({
     key,
-    chord: parseChord(`${spell(tonic + offset, spellIn)}${quality}`),
+    chords: typeof b[0] === 'number' ? [chord(b as Step)] : (b as [Step, Step]).map(chord),
   }));
+}
+
+// How a quality is written on the lead sheet, where it differs from its name.
+function symbolFor(quality: Quality): string {
+  return quality === 'mMaj7' ? 'm(maj7)' : quality;
 }
 
 /** One major ii–V–I–I (4 bars) in the key whose tonic is the given pitch class. */
@@ -44,8 +74,8 @@ export function minorKeyName(tonic: number): string {
 }
 
 /** A progression in a minor key, spelled with its relative major's sharps or flats. */
-export function minorProgression(tonic: number, steps: Step[]): Bar[] {
-  return progression(tonic, steps, minorKeyName(tonic), tonic + 3);
+export function minorProgression(tonic: number, bars: BarSteps[]): Bar[] {
+  return progression(tonic, bars, minorKeyName(tonic), tonic + 3);
 }
 
 /** One minor ii–V–i–i (4 bars): half-diminished ii, dominant V (♭9 and ♭13 fit), minor i. */

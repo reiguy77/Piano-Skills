@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { iiVIBars } from '../drills/iiVI';
-import { gradeVoicing } from '../theory/chords';
+import { gradeVoicing, type Quality } from '../theory/chords';
 import { analysisMs, transcribeChord } from './transcribe';
 
 // Real-piano accuracy is measured by the benchmark in bench/; these cover the basics on a
@@ -57,18 +57,18 @@ describe('transcribeChord', () => {
   });
 
   it('grades every shell in the ii–V–I drill as correct', () => {
-    const third = { m7: 3, '7': 4, maj7: 4, m7b5: 3, dim7: 3 };
-    const seventh = { m7: 10, '7': 10, maj7: 11, m7b5: 10, dim7: 9 };
-    const wrong = iiVIBars().filter(({ chord }) => {
+    const third: Partial<Record<Quality, number>> = { m7: 3, '7': 4, maj7: 4 };
+    const seventh: Partial<Record<Quality, number>> = { m7: 10, '7': 10, maj7: 11 };
+    const wrong = iiVIBars().map((b) => b.chords[0]).filter((chord) => {
       const root = 43 + ((chord.root - 7 + 12) % 12); // G2 up to F♯3
       // Alternate 1-3-7 and 1-7-3 voicings.
       const notes =
         root % 2
-          ? [root, root + third[chord.quality] + 12, root + seventh[chord.quality]]
-          : [root, root + third[chord.quality], root + seventh[chord.quality]];
+          ? [root, root + third[chord.quality]! + 12, root + seventh[chord.quality]!]
+          : [root, root + third[chord.quality]!, root + seventh[chord.quality]!];
       return !gradeVoicing(chord, hear(notes)).correct;
     });
-    expect(wrong.map((b) => b.chord.symbol)).toEqual([]);
+    expect(wrong.map((c) => c.symbol)).toEqual([]);
   });
 
   it('still hears a softer inner voice', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard } from './components/Keyboard';
 import { MeasureStrip } from './components/MeasureStrip';
-import { findSkill, KEYS, SKILLS } from './drills/library';
+import { changes, findSkill, KEYS, SKILLS } from './drills/library';
 import { startMetronome } from './midi/metronome';
 import { useMic } from './mic/useMic';
 import { useMidi, type Strike } from './midi/useMidi';
@@ -11,7 +11,7 @@ import { beatMs, gradeTiming, type TimingGrade } from './theory/timing';
 const BEATS_PER_BAR = 4;
 const SWING = 2;
 
-interface BarResult {
+interface ChordResult {
   voicing: VoicingGrade;
   timing: TimingGrade;
 }
@@ -45,28 +45,30 @@ export default function App() {
   });
   const skill = findSkill(skillId);
   const bars = useMemo(() => skill.bars(key), [skill, key]);
+  const chords = useMemo(() => changes(bars, BEATS_PER_BAR), [bars]);
   const [bpm, setBpm] = useState(120);
   const [input, setInput] = useState<Input>(() => stored<Input>('input', 'midi'));
   const [micLatency, setMicLatency] = useState(() => stored<number>('micLatencyMs', 40));
   const [phase, setPhase] = useState<Phase>('setup');
   // Beats since the first downbeat; the count-in is -BEATS_PER_BAR…-1.
   const [beat, setBeat] = useState(-BEATS_PER_BAR);
-  const [results, setResults] = useState<Record<number, BarResult>>({});
+  const [results, setResults] = useState<Record<number, ChordResult>>({});
   const run = useRef<{ downbeatMs: number; stop: () => void } | null>(null);
 
-  const barMs = beatMs(bpm) * BEATS_PER_BAR;
   const barIndex = Math.floor(beat / BEATS_PER_BAR);
+  const chordIndex = chords.findLastIndex((c) => c.beat <= beat);
 
   const onStrike = (s: Strike) => {
     if (phase !== 'running' || !run.current) return;
-    // Round to the nearest barline so an anticipated chord is graded against the bar it leads into.
-    const target = Math.round((s.atMs - run.current.downbeatMs) / barMs);
-    if (target < 0 || target >= bars.length) return;
+    // Take the nearest chord change, so an anticipated chord is graded against the one it leads into.
+    const at = (s.atMs - run.current.downbeatMs) / beatMs(bpm);
+    const target = chords.reduce((best, c, i) => (Math.abs(c.beat - at) < Math.abs(chords[best].beat - at) ? i : best), 0);
+    if (at < -1 || at > bars.length * BEATS_PER_BAR) return;
     const result = {
-      voicing: gradeVoicing(bars[target].chord, s.notes),
-      timing: gradeTiming(s.atMs, run.current.downbeatMs + target * barMs, bpm, SWING),
+      voicing: gradeVoicing(chords[target].chord, s.notes),
+      timing: gradeTiming(s.atMs, run.current.downbeatMs + chords[target].beat * beatMs(bpm), bpm, SWING),
     };
-    // First strike per bar counts.
+    // First strike per chord counts.
     setResults((r) => (r[target] ? r : { ...r, [target]: result }));
   };
 
@@ -124,7 +126,7 @@ export default function App() {
 
   const graded = Object.values(results);
   const clean = graded.filter((r) => r.voicing.correct && r.timing.onTime).length;
-  const last = results[barIndex] ?? results[barIndex - 1];
+  const last = results[chordIndex] ?? results[chordIndex - 1];
 
   return (
     <main>
@@ -178,8 +180,8 @@ export default function App() {
             </fieldset>
           )}
           <p>
-            Play a 3–7 shell for each chord, landing on beat 1 (or a swung eighth early). Root, 9 and 13 are
-            optional; the 3rd and 7th are required.
+            Play a shell for each chord, landing on its beat (or a swung eighth early). The 3rd and 7th are
+            required (the 6th on a 6 chord, the 4th on a sus); root, 5, 9 and 13 are optional.
           </p>
           <label htmlFor="bpm">Tempo: {bpm} BPM</label>
           <input id="bpm" type="range" min={60} max={240} value={bpm} onChange={(e) => setBpm(+e.target.value)} />
@@ -226,7 +228,7 @@ export default function App() {
       {phase === 'done' && (
         <section className="card">
           <h2>
-            {clean} / {bars.length} bars clean
+            {clean} / {chords.length} chords clean
           </h2>
           <p className="muted">
             Average timing:{' '}
@@ -235,9 +237,9 @@ export default function App() {
               : 'n/a'}
           </p>
           <ul className="results">
-            {bars.map((b, i) => (
+            {chords.map((c, i) => (
               <li key={i} className={results[i]?.voicing.correct && results[i]?.timing.onTime ? 'ok' : 'miss'}>
-                <span>{b.chord.symbol}</span>
+                <span>{c.chord.symbol}</span>
                 <span>{results[i] ? describe(results[i]) : 'not played'}</span>
               </li>
             ))}
@@ -275,11 +277,11 @@ function MicStatusLine({ status, level }: { status: ReturnType<typeof useMic>['s
   );
 }
 
-function Feedback({ result }: { result: BarResult }) {
+function Feedback({ result }: { result: ChordResult }) {
   return <p className={result.voicing.correct && result.timing.onTime ? 'ok' : 'miss'}>{describe(result)}</p>;
 }
 
-function describe({ voicing, timing }: BarResult) {
+function describe({ voicing, timing }: ChordResult) {
   const notes = voicing.correct
     ? `${voicing.heard.join(' + ')}`
     : [voicing.missing.length && `missing ${voicing.missing.join(', ')}`, voicing.wrong.length && `wrong ${voicing.wrong.join(', ')}`]

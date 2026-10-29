@@ -73,9 +73,13 @@ legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
 .strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 6px; }
 .measure { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--muted); }
 .measure-chord { font-size: clamp(13px, 3.8vw, 22px); font-weight: 700; color: var(--ink); white-space: nowrap; }
+.measure-chord { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 0.4em; }
+.measure-chord .chord-now { color: var(--accent); }
+.measure-chord .chord-ready { background: var(--accent); color: #fff; border-radius: 6px; padding: 0 4px; }
 .measure-key, .measure-tag { font-size: 12px; min-height: 1.2em; }
 .measure.current { border-color: var(--accent); border-width: 2.5px; }
 .measure.current .measure-chord { font-size: clamp(22px, 7vw, 44px); font-weight: 800; }
+.measure.current.split .measure-chord { font-size: clamp(16px, 4.4vw, 30px); }
 .measure.current .measure-tag { color: var(--accent); font-weight: 700; }
 .measure.next { border-color: var(--ink); }
 .measure.next .measure-tag { font-weight: 700; }

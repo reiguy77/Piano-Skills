@@ -1,7 +1,7 @@
 // The benchmark chords, shared by the benchmarks and by comparisons against saved model output
 // (which line up by index, so the order of cases and of calls to random() must not change).
-import { iiVIBars, type Bar } from '../src/drills/iiVI';
-import type { Quality } from '../src/theory/chords';
+import { iiVIBars } from '../src/drills/iiVI';
+import type { ChordSymbol, Quality } from '../src/theory/chords';
 import { renderChord, rng, type Condition } from './piano';
 
 const LOW = 40; // E2
@@ -78,25 +78,25 @@ export const DRILL_VOICINGS: Record<string, Partial<Record<Quality, number[]>>> 
 };
 
 /**
- * Every drill bar in every voicing, each followed by a wrong version (the 3rd a semitone off,
+ * Every drill chord in every voicing, each followed by a wrong version (the 3rd a semitone off,
  * major ↔ minor, the classic mistake), rendered in benchmark order.
  */
 export function* drillRenders(cond: Condition) {
   const random = rng(5);
   let prev: number[] | undefined;
   for (const [voicing, shapes] of Object.entries(DRILL_VOICINGS))
-    for (const bar of iiVIBars()) {
-      const shape = shapes[bar.chord.quality]!;
+    for (const chord of iiVIBars().map((b) => b.chords[0])) {
+      const shape = shapes[chord.quality]!;
       // Root between E2 and D♯3 for rooted voicings; rootless ones sit an octave up.
-      const root = 40 + ((bar.chord.root - 4 + 12) % 12) + (shape[0] === 0 ? 0 : 12);
+      const root = 40 + ((chord.root - 4 + 12) % 12) + (shape[0] === 0 ? 0 : 12);
       const notes = shape.map((i) => root + i);
-      yield { bar, voicing, notes, wrong: false, audio: renderChord(notes, 600, { ...cond.options, random, previous: prev }) };
-      const pc = (n: number) => (((n - bar.chord.root) % 12) + 12) % 12;
+      yield { chord, voicing, notes, wrong: false, audio: renderChord(notes, 600, { ...cond.options, random, previous: prev }) };
+      const pc = (n: number) => (((n - chord.root) % 12) + 12) % 12;
       const third = notes.findIndex((n) => [3, 4].includes(pc(n)));
       const wrongNotes = notes.map((n, i) => (i === third ? n + (pc(n) === 3 ? 1 : -1) : n));
-      yield { bar, voicing, notes: wrongNotes, wrong: true, audio: renderChord(wrongNotes, 600, { ...cond.options, random, previous: notes }) };
+      yield { chord, voicing, notes: wrongNotes, wrong: true, audio: renderChord(wrongNotes, 600, { ...cond.options, random, previous: notes }) };
       prev = notes;
     }
 }
 
-export type DrillRender = { bar: Bar; voicing: string; notes: number[]; wrong: boolean; audio: Float32Array };
+export type DrillRender = { chord: ChordSymbol; voicing: string; notes: number[]; wrong: boolean; audio: Float32Array };

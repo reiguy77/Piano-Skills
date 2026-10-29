@@ -1,6 +1,17 @@
-import { iiVIBars, iiVIInKey, keyName, minorIiVIInKey, minorKeyName, progression, type Bar } from './iiVI';
+import {
+  changes,
+  iiVIBars,
+  iiVIInKey,
+  keyName,
+  minorIiVIInKey,
+  minorKeyName,
+  minorProgression,
+  progression,
+  type Bar,
+  type Change,
+} from './iiVI';
 
-export type { Bar };
+export { changes, type Bar, type Change };
 
 export interface Skill {
   id: string;
@@ -81,6 +92,33 @@ export const SKILLS: Skill[] = [
     },
   },
   {
+    id: 'two-beat-turnarounds',
+    name: 'Two-beat turnarounds',
+    description: 'Two chords a bar: I–VI7 | ii–V | iii–VI7 | ii–V, twice. The VI7 is the V of ii.',
+    needsKey: true,
+    title: (key) => `Two-beat turnarounds in ${keyName(key)}`,
+    bars: (key) => {
+      const loop = progression(key, [
+        [[0, 'maj7'], [9, '7']],
+        [[2, 'm7'], [7, '7']],
+        [[4, 'm7'], [9, '7']],
+        [[2, 'm7'], [7, '7']],
+      ]);
+      return [...loop, ...loop];
+    },
+  },
+  {
+    id: 'sus-to-dominant',
+    name: 'Sus, dominant, 6',
+    description: 'V7sus4 opens into V7 and lands on a I6, twice. On the sus chord the 4th replaces the 3rd.',
+    needsKey: true,
+    title: (key) => `Sus to dominant in ${keyName(key)}`,
+    bars: (key) => {
+      const phrase = progression(key, [[7, '7sus4'], [7, '7'], [0, '6'], [0, '6']]);
+      return [...phrase, ...phrase];
+    },
+  },
+  {
     id: 'minor-iivi',
     name: 'Minor ii–V–i',
     description: 'Half-diminished ii, dominant V, minor i, played twice. The ♭9 and ♭13 sound great on the V.',
@@ -88,6 +126,18 @@ export const SKILLS: Skill[] = [
     keyLabel: 'Minor key',
     title: (key) => `Minor ii–V–i in ${minorKeyName(key)}`,
     bars: (key) => [...minorIiVIInKey(key), ...minorIiVIInKey(key)],
+  },
+  {
+    id: 'minor-tonic-colours',
+    name: 'Minor ii–V to m(maj7) and m6',
+    description: 'A two-beat minor ii–V, then the tonic as m(maj7) and m6, the colours minor tunes really use.',
+    needsKey: true,
+    keyLabel: 'Minor key',
+    title: (key) => `Minor tonic colours in ${minorKeyName(key)}`,
+    bars: (key) => {
+      const phrase = minorProgression(key, [[[2, 'm7b5'], [7, '7']], [0, 'mMaj7'], [0, 'm6'], [0, 'm6']]);
+      return [...phrase, ...phrase];
+    },
   },
   {
     id: 'autumn-leaves',
@@ -112,6 +162,19 @@ export const SKILLS: Skill[] = [
         [0, '7'], [5, '7'], [0, '7'], [0, '7'],
         [5, '7'], [5, '7'], [0, '7'], [9, '7'],
         [2, 'm7'], [7, '7'], [0, '7'], [7, '7'],
+      ]),
+  },
+  {
+    id: 'jazz-blues-iivs',
+    name: 'Jazz blues with ii–Vs',
+    description: 'The blues with its two-beat ii–Vs and the ♯IV°7 in bar 6, as heard on bebop heads.',
+    needsKey: true,
+    title: (key) => `Jazz blues with ii–Vs in ${keyName(key)}`,
+    bars: (key) =>
+      progression(key, [
+        [0, '7'], [5, '7'], [0, '7'], [[7, 'm7'], [0, '7']],
+        [5, '7'], [6, 'dim7', true], [0, '7'], [[4, 'm7'], [9, '7']],
+        [2, 'm7'], [7, '7'], [[0, '7'], [9, '7']], [[2, 'm7'], [7, '7']],
       ]),
   },
 ];

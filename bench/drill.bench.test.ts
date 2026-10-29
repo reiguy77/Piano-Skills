@@ -17,7 +17,7 @@ it('drill grading through the mic', () => {
         const s = byVoicing.get(r.voicing) ?? { right: 0, falseFail: 0, wrong: 0, falsePass: 0 };
         byVoicing.set(r.voicing, s);
         const heard = detect(r.audio, SR);
-        const correct = gradeVoicing(r.bar.chord, heard).correct;
+        const correct = gradeVoicing(r.chord, heard).correct;
         if (r.wrong) {
           s.wrong++;
           if (correct) s.falsePass++;
@@ -26,7 +26,7 @@ it('drill grading through the mic', () => {
           if (!correct) {
             s.falseFail++;
             if (examples.length < 12)
-              examples.push(`  ${r.bar.chord.symbol} ${r.voicing}: played ${r.notes.join(' ')} heard ${heard.join(' ')}`);
+              examples.push(`  ${r.chord.symbol} ${r.voicing}: played ${r.notes.join(' ')} heard ${heard.join(' ')}`);
           }
         }
       }

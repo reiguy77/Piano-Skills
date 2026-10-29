@@ -83,7 +83,7 @@ it('dsp + basic pitch ensembles', () => {
     }
     let [ff, fp] = [0, 0];
     for (const r of drill) {
-      const ok = gradeVoicing(r.bar.chord, combine(r.dsp, r.e)).correct;
+      const ok = gradeVoicing(r.chord, combine(r.dsp, r.e)).correct;
       if (r.wrong && ok) fp++;
       if (!r.wrong && !ok) ff++;
     }

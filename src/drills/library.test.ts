@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { iiVIBars } from './iiVI';
-import { findSkill, KEYS, SKILLS } from './library';
+import { changes, findSkill, KEYS, SKILLS, type Bar } from './library';
 
-const symbols = (id: string, key = 0) => findSkill(id).bars(key).map((b) => b.chord.symbol);
+const symbols = (id: string, key = 0) => findSkill(id).bars(key).flatMap((b) => b.chords.map((c) => c.symbol));
+const bar = (b: Bar) => b.chords.map((c) => c.symbol).join(' ');
 
 describe('skill library', () => {
   it('plays a ii–V–I–I twice in the chosen key', () => {
@@ -21,13 +22,13 @@ describe('skill library', () => {
 
   it('chains the I into the next ii a whole step down', () => {
     const bars = findSkill('iivi-chain').bars(0);
-    expect(bars.map((b) => b.chord.symbol)).toEqual([
+    expect(bars.map(bar)).toEqual([
       'Dm7', 'G7', 'Cmaj7', 'Cmaj7',
       'Cm7', 'F7', 'B♭maj7', 'B♭maj7',
     ]);
     expect(bars.map((b) => b.key)).toEqual(['C', 'C', 'C', 'C', 'B♭', 'B♭', 'B♭', 'B♭']);
     // The I's root carries over as the next ii's root.
-    expect(bars[4].chord.root).toBe(bars[3].chord.root);
+    expect(bars[4].chords[0].root).toBe(bars[3].chords[0].root);
   });
 
   it('wraps the chain around the octave', () => {
@@ -42,7 +43,7 @@ describe('skill library', () => {
     expect(bars).toEqual(iiVIBars());
     expect(bars).toHaveLength(48);
     expect([...new Set(bars.map((b) => b.key))]).toEqual(['C', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'B', 'E', 'A', 'D', 'G']);
-    expect(bars.slice(0, 4).map((b) => b.chord.symbol)).toEqual(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);
+    expect(bars.slice(0, 4).map(bar)).toEqual(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);
   });
 
   it('builds every skill in every key with valid chords', () => {
@@ -50,7 +51,7 @@ describe('skill library', () => {
       for (const { pc } of KEYS) {
         const bars = s.bars(pc);
         expect(bars.length % 4).toBe(0);
-        for (const b of bars) expect(['m7', '7', 'maj7', 'm7b5']).toContain(b.chord.quality);
+        for (const b of bars) expect([1, 2]).toContain(b.chords.length);
       }
   });
 
@@ -77,7 +78,7 @@ describe('skill library', () => {
 
   it('moves “Autumn Leaves” from the relative major into the minor key', () => {
     const bars = findSkill('autumn-leaves').bars(7);
-    expect(bars.map((b) => b.chord.symbol)).toEqual([
+    expect(bars.map(bar)).toEqual([
       'Cm7', 'F7', 'B♭maj7', 'E♭maj7',
       'Am7b5', 'D7', 'Gm7', 'Gm7',
     ]);
@@ -90,6 +91,40 @@ describe('skill library', () => {
       'E♭7', 'E♭7', 'B♭7', 'G7',
       'Cm7', 'F7', 'B♭7', 'F7',
     ]);
+  });
+
+  it('splits two-chord bars into two-beat changes', () => {
+    const bars = findSkill('two-beat-turnarounds').bars(0);
+    expect(bars.slice(0, 4).map(bar)).toEqual(['Cmaj7 A7', 'Dm7 G7', 'Em7 A7', 'Dm7 G7']);
+    const c = changes(bars, 4);
+    expect(c).toHaveLength(16);
+    expect(c.slice(0, 3).map((x) => [x.chord.symbol, x.bar, x.beat, x.beats])).toEqual([
+      ['Cmaj7', 0, 0, 2],
+      ['A7', 0, 2, 2],
+      ['Dm7', 1, 4, 2],
+    ]);
+    const whole = changes(findSkill('iivi-one-key').bars(0), 4);
+    expect(whole.map((x) => x.beat)).toEqual([0, 4, 8, 12, 16, 20, 24, 28]);
+  });
+
+  it('plays the sus chord before its dominant and lands on a 6', () => {
+    expect(symbols('sus-to-dominant', 2).slice(0, 4)).toEqual(['A7sus4', 'A7', 'D6', 'D6']);
+  });
+
+  it('colours the minor tonic with m(maj7) and m6', () => {
+    const bars = findSkill('minor-tonic-colours').bars(9);
+    expect(bars.slice(0, 4).map(bar)).toEqual(['Bm7b5 E7', 'Am(maj7)', 'Am6', 'Am6']);
+    expect(bars[1].chords[0].quality).toBe('mMaj7');
+  });
+
+  it('builds the jazz blues with ii–Vs, spelling the ♯IV°7 with a sharp', () => {
+    expect(findSkill('jazz-blues-iivs').bars(10).map(bar)).toEqual([
+      'B♭7', 'E♭7', 'B♭7', 'Fm7 B♭7',
+      'E♭7', 'Edim7', 'B♭7', 'Dm7 G7',
+      'Cm7', 'F7', 'B♭7 G7', 'Cm7 F7',
+    ]);
+    expect(findSkill('jazz-blues-iivs').bars(0)[5].chords[0].symbol).toBe('F♯dim7');
+    expect(findSkill('jazz-blues-iivs').bars(7)[5].chords[0].symbol).toBe('C♯dim7');
   });
 
   it('falls back to the first skill for an unknown id', () => {
